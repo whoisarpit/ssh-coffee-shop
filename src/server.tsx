@@ -59,46 +59,76 @@ const server = new Server({
       session.on('shell', (accept, reject) => {
         const stream = accept();
         
-        // Set up stream properties for React Ink compatibility
-        (stream as any).isTTY = true;
-        (stream as any).rows = 24;
-        (stream as any).columns = 80;
-        
-        // Add setRawMode method that React Ink expects
-        (stream as any).setRawMode = () => {
-          // SSH handles raw mode, so we just return the stream
+        // Create a comprehensive stream wrapper for React Ink compatibility
+        const makeInkCompatible = (stream: any) => {
+          // TTY properties
+          stream.isTTY = true;
+          stream.rows = 24;
+          stream.columns = 80;
+          
+          // Raw mode methods
+          stream.setRawMode = () => stream;
+          Object.defineProperty(stream, 'isRaw', {
+            get: () => true,
+            set: () => {},
+            enumerable: true,
+            configurable: true
+          });
+          
+          // Node.js stream methods that React Ink expects
+          stream.ref = () => stream;
+          stream.unref = () => stream;
+          stream.pause = stream.pause || (() => stream);
+          stream.resume = stream.resume || (() => stream);
+          stream.setEncoding = stream.setEncoding || (() => stream);
+          
+          // Event handling (ensure these exist)
+          if (!stream.removeListener) {
+            stream.removeListener = stream.off || (() => stream);
+          }
+          
           return stream;
         };
         
-        // Add isRaw property
-        Object.defineProperty(stream, 'isRaw', {
-          get: () => true,
-          set: () => {},
-          enumerable: true,
-          configurable: true
-        });
+        // Make the stream compatible with React Ink
+        makeInkCompatible(stream);
         
         console.log('🎨 Starting React Ink application...');
         
-        // Start React Ink application
-        const { unmount } = render(
-          <CoffeeShopApp 
-            onExit={() => {
-              console.log('👋 Exiting application...');
-              unmount();
-              stream.end();
-            }}
-          />, 
-          { 
-            stdout: stream as any,
-            stdin: stream as any,
-            debug: false
-          }
-        );
+        // Start React Ink application with error handling
+        try {
+          const { unmount } = render(
+            <CoffeeShopApp 
+              onExit={() => {
+                console.log('👋 Exiting application...');
+                unmount();
+                stream.end();
+              }}
+            />, 
+            { 
+              stdout: stream as any,
+              stdin: stream as any,
+              debug: false
+            }
+          );
+          
+          console.log('✅ React Ink application started successfully');
+          
+          // Store unmount function for cleanup
+          (stream as any)._inkUnmount = unmount;
+        } catch (error) {
+          console.error('❌ Failed to start React Ink application:', error);
+          stream.write('Error: Failed to start terminal application\r\n');
+          stream.write('Please ensure you connected with: ssh -t -p 2222 localhost\r\n');
+          stream.end();
+          return;
+        }
 
         stream.on('close', () => {
           console.log('📱 Session closed');
-          unmount();
+          if ((stream as any)._inkUnmount) {
+            (stream as any)._inkUnmount();
+          }
         });
 
         // Handle window resize
@@ -111,7 +141,9 @@ const server = new Server({
         // Handle stream errors
         stream.on('error', (err: any) => {
           console.error('💥 Stream error:', err.message);
-          unmount();
+          if ((stream as any)._inkUnmount) {
+            (stream as any)._inkUnmount();
+          }
         });
       });
     });
