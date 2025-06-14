@@ -30,13 +30,61 @@ const server = new Server({
     client.on('session', (accept, reject) => {
       const session = accept();
       
+      // Handle PTY allocation requests
+      session.on('pty', (accept, reject, info) => {
+        console.log('🖥️  PTY requested:', info);
+        const ptyStream = accept();
+        if (ptyStream) {
+          // Set up the PTY stream properties for React Ink
+          (ptyStream as any).rows = info.rows || 24;
+          (ptyStream as any).columns = info.cols || 80;
+          (ptyStream as any).isTTY = true;
+          
+          // Add required properties for raw mode support
+          (ptyStream as any).setRawMode = () => {
+            // Mock setRawMode - the SSH stream handles this
+            return ptyStream;
+          };
+          
+          // Mock the isRaw property
+          Object.defineProperty(ptyStream, 'isRaw', {
+            get: () => true,
+            set: () => {},
+            enumerable: true,
+            configurable: true
+          });
+        }
+      });
+      
       session.on('shell', (accept, reject) => {
         const stream = accept();
+        
+        // Set up stream properties for React Ink compatibility
+        (stream as any).isTTY = true;
+        (stream as any).rows = 24;
+        (stream as any).columns = 80;
+        
+        // Add setRawMode method that React Ink expects
+        (stream as any).setRawMode = () => {
+          // SSH handles raw mode, so we just return the stream
+          return stream;
+        };
+        
+        // Add isRaw property
+        Object.defineProperty(stream, 'isRaw', {
+          get: () => true,
+          set: () => {},
+          enumerable: true,
+          configurable: true
+        });
+        
+        console.log('🎨 Starting React Ink application...');
         
         // Start React Ink application
         const { unmount } = render(
           <CoffeeShopApp 
             onExit={() => {
+              console.log('👋 Exiting application...');
               unmount();
               stream.end();
             }}
@@ -54,8 +102,16 @@ const server = new Server({
         });
 
         // Handle window resize
-        stream.on('window-change', () => {
-          // React Ink handles this automatically
+        stream.on('window-change', (info: any) => {
+          console.log('📐 Window resized:', info);
+          if ((stream as any).rows !== undefined) (stream as any).rows = info.rows;
+          if ((stream as any).columns !== undefined) (stream as any).columns = info.cols;
+        });
+        
+        // Handle stream errors
+        stream.on('error', (err: any) => {
+          console.error('💥 Stream error:', err.message);
+          unmount();
         });
       });
     });
@@ -72,11 +128,12 @@ const server = new Server({
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`✨ SSH Coffee Shop listening on port ${PORT}`);
-  console.log(`🔗 Connect with: ssh -p ${PORT} localhost`);
+  console.log(`🔗 Connect with: ssh -t -p ${PORT} localhost`);
+  console.log(`💡 Note: Use -t flag to allocate a pseudo-terminal`);
   console.log('⚠️  Use Ctrl+C to stop server');
 });
 
-server.on('error', (err) => {
+server.on('error', (err: any) => {
   console.error('💥 Server error:', err.message);
   if (err.code === 'EADDRINUSE') {
     console.log(`💡 Port ${PORT} is already in use. Try a different port or stop the existing process.`);

@@ -42,12 +42,14 @@ pnpm run dev
 ### Connect to the Coffee Shop
 
 ```bash
-# Connect via SSH (default port 2222)
-ssh -p 2222 localhost
+# Connect via SSH with PTY allocation (default port 2222)
+ssh -t -p 2222 localhost
 
 # Or specify a different port
 PORT=3333 pnpm run dev
-ssh -p 3333 localhost
+ssh -t -p 3333 localhost
+
+# Note: The -t flag allocates a pseudo-terminal, required for React Ink
 ```
 
 ## How to Use 🎯
@@ -179,9 +181,22 @@ pnpm run generate-keys
 
 **React Ink Raw Mode Error**
 ```bash
-ERROR Raw mode is not supported on the current process.stdin
+ERROR Raw mode is not supported on the stdin provided to Ink
+PTY allocation request failed on channel 0
 ```
-Solution: Use proper SSH connection instead of local testing, or ensure TTY environment.
+Solution: Use the `-t` flag when connecting via SSH to allocate a pseudo-terminal:
+```bash
+ssh -t -p 2222 localhost
+```
+
+**Connection Refused**
+```bash
+ssh: connect to host localhost port 2222: Connection refused
+```
+Solution: Ensure the SSH server is running:
+```bash
+pnpm run dev
+```
 
 ### SSH Client Tips
 
