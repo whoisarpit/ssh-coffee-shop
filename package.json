@@ -1,0 +1,36 @@
+{
+  "name": "ssh-coffee-shop",
+  "version": "1.0.0",
+  "description": "SSH-based coffee shop application inspired by Terminal.shop, built with React Ink",
+  "main": "dist/server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/server.tsx",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test:components": "tsx src/test-components.tsx",
+    "generate-keys": "ssh-keygen -t rsa -b 2048 -f host.key -N \"\"",
+    "setup": "pnpm run generate-keys"
+  },
+  "keywords": [
+    "ssh",
+    "terminal",
+    "coffee",
+    "react-ink",
+    "nodejs"
+  ],
+  "author": "Arpit",
+  "license": "MIT",
+  "dependencies": {
+    "@types/node": "^24.0.1",
+    "@types/react": "^19.1.8",
+    "ink": "^6.0.0",
+    "react": "^19.1.0",
+    "ssh2": "^1.16.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  },
+  "devDependencies": {
+    "@types/ssh2": "^1.15.5"
+  }
+}
